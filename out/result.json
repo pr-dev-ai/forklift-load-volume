@@ -1,0 +1,53 @@
+{
+  "source": "pass_0216.mp4",
+  "fps": 50.0,
+  "frames": 345,
+  "size": [
+    1920,
+    1080
+  ],
+  "pass_window_s": [
+    0.28,
+    6.88
+  ],
+  "auto_picked_frames": [
+    256,
+    246,
+    236
+  ],
+  "measured_frames": [
+    240,
+    256
+  ],
+  "box_fit": {
+    "width_m": 2.4,
+    "depth_m": 2.5,
+    "height_m": 1.53,
+    "volume_m3": 9.1,
+    "focal_px": 3307,
+    "reproj_rms_px": 3.5
+  },
+  "counting_check": {
+    "pallets_across": 2,
+    "pallets_deep": 3,
+    "layers": 5,
+    "footprint_m2": 5.76,
+    "crate_layer_height_m": 0.305,
+    "volume_m3": 8.8,
+    "volume_incl_pallets_m3": 9.63
+  },
+  "uncertainty": {
+    "volume_m3_p05": 8.0,
+    "volume_m3_p50": 9.2,
+    "volume_m3_p95": 10.5,
+    "height_m_p05_p95": [
+      1.47,
+      1.59
+    ],
+    "depth_m_p05_p95": [
+      2.33,
+      2.71
+    ],
+    "runs": 200
+  }
+}

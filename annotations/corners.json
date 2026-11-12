@@ -1,0 +1,5 @@
+{
+  "_note": "Hand-marked corners of the crate stack (pallets excluded). A=near bottom, B=front bottom right, C=front top right, D=near top, E=side far bottom, F=side far top. Pixel coordinates in the 1920x1080 frame. Frame index is within data/pass_0216.mp4.",
+  "240": {"A": [906, 868], "B": [1637, 877], "C": [1598, 375], "D": [897, 310], "E": [590, 915], "F": [600, 460], "sigma_px": 4},
+  "256": {"A": [1078, 862], "B": [1860, 868], "C": [1830, 330], "D": [1072, 255], "E": [708, 912], "F": [712, 432], "sigma_px": 6}
+}

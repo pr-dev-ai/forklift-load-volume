@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forklift load volume</title>
+<style>
+:root{--bg:#f4f5f3;--panel:#fff;--ink:#1c2128;--ink2:#56606c;--line:#d5d9d3;--accent:#1f6f8b;--ok:#2f7d4f;--warn:#9a5b16;--mono:ui-monospace,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#14181d;--panel:#1c2128;--ink:#e7ebef;--ink2:#a9b2bd;--line:#2e353e;--accent:#6fb6d1;--ok:#6cc693;--warn:#e0a35c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:1.6rem;margin:0 0 4px}
+h2{font-size:1.1rem;margin:0 0 10px}
+h2 span{font-family:var(--mono);color:var(--accent);font-weight:400;margin-right:8px}
+p{margin:0 0 10px}.muted{color:var(--ink2)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-top:16px}
+button{font:inherit;font-weight:600;padding:9px 16px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent)}
+button:disabled{opacity:.5;cursor:wait}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.row>*{flex:1 1 320px;min-width:0}
+video,canvas{width:100%;height:auto;border-radius:6px;background:#000;display:block}
+canvas{touch-action:none;cursor:crosshair}
+.big{font-size:2.6rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.big small{font-size:1rem;font-weight:500;color:var(--ink2)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+td,th{text-align:left;padding:7px 8px;border-top:1px solid var(--line)}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2);border-top:0}
+.chip{display:inline-block;font-family:var(--mono);font-size:.85rem;padding:2px 8px;border:1px solid var(--line);border-radius:999px;margin:0 6px 6px 0}
+.status{font-family:var(--mono);font-size:.85rem;color:var(--ink2);margin-left:10px}
+.err{color:var(--warn)}
+ul{margin:0;padding-left:20px}li{margin-bottom:5px}
+.cap{font-size:.85rem;color:var(--ink2);margin-top:6px}
+</style>
+</head>
+<body>
+<main>
+<h1>Forklift load volume</h1>
+<p class="muted">Estimates the volume of the load on a passing forklift from one camera, using a EUR pallet as the ruler. Follow the four steps.</p>
+
+<section>
+  <h2><span>1</span>The feed</h2>
+  <div class="row">
+    <div>
+      <video id="vid" src="/data/pass_0216.mp4" controls muted loop playsinline></video>
+      <p class="cap">Seven seconds from the source video (2:16 to 2:23). The camera stands still, so it is treated as a camera feed.</p>
+    </div>
+    <div>
+      <p>The program reads this clip frame by frame. Because the camera does not move, anything that changes is the vehicle. It finds when the truck is in view and which frames are best to measure.</p>
+      <button id="btnDetect">Detect the pass</button><span class="status" id="stDetect"></span>
+      <div id="detectOut" style="margin-top:14px"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span>2</span>Mark the six corners</h2>
+  <p class="muted">The yellow dots are the corners of the crate stack (pallets excluded), marked by hand on two frames. Drag any dot to correct it. This is the one manual step.</p>
+  <div class="row">
+    <div><canvas id="c240" width="1920" height="1080"></canvas><p class="cap">Frame 240</p></div>
+    <div><canvas id="c256" width="1920" height="1080"></canvas><p class="cap">Frame 256</p></div>
+  </div>
+  <p style="margin-top:12px"><button id="btnFit">Fit the box</button> <button class="ghost" id="btnReset">Reset corners</button><span class="status" id="stFit"></span></p>
+</section>
+
+<section>
+  <h2><span>3</span>Result</h2>
+  <div class="row">
+    <div>
+      <div class="big" id="vol">–<small> m³</small></div>
+      <p class="muted" id="range">Press "Fit the box".</p>
+      <p class="cap">Volume of the crates only. The only real size given to the program is the width: two EUR pallets side by side = 2.4 m. It solves the camera, the depth and the height so that one 3D box matches the corners in both frames (green lines).</p>
+    </div>
+    <div>
+      <table id="tbl"><tr><th></th><th>Width</th><th>Depth</th><th>Height</th><th>Volume</th></tr>
+        <tr><td>Box fit</td><td colspan="4" class="muted">not run yet</td></tr></table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span>4</span>Where it fails</h2>
+  <ul>
+    <li><b>Depth is the weakest number.</b> The side of the load is seen at a steep angle, so a few pixels of error move depth by 10 cm or more. Drag a far corner and refit to see it.</li>
+    <li><b>The top and back are never seen.</b> A full rectangular stack is assumed.</li>
+    <li><b>It needs a known-size object.</b> No pallet in view means no scale.</li>
+    <li><b>Corners are marked by hand.</b> Automatic corner finding is the first thing to add; the backlight in this clip makes it hard.</li>
+    <li><b>The pass detector assumes a static camera.</b></li>
+    <li><b>On a fixed, calibrated camera</b> the focal length, floor and scale are known in advance, so one frame is enough and the depth range shrinks.</li>
+  </ul>
+</section>
+</main>
+
+<script>
+const ORDER=["A","B","C","D","E","F"], EDGES=[[0,1],[1,2],[2,3],[3,0],[0,4],[4,5],[5,3]];
+const FR=["240","256"]; let ann={}, base={}, reproj={}, imgs={}, drag=null;
+const $=id=>document.getElementById(id);
+
+async function init(){
+  const a=await (await fetch("/api/annotations")).json();
+  for(const k of FR){ ann[k]=JSON.parse(JSON.stringify(a[k])); base[k]=JSON.parse(JSON.stringify(a[k]));
+    const im=new Image(); im.onload=()=>draw(k); im.src="/data/frame_0"+k+".jpg"; imgs[k]=im; bind(k); }
+}
+function draw(k){
+  const c=$("c"+k), g=c.getContext("2d"); g.drawImage(imgs[k],0,0,1920,1080);
+  if(reproj[k]){ g.strokeStyle="#22e06a"; g.lineWidth=5; g.beginPath();
+    for(const [i,j] of EDGES){ g.moveTo(...reproj[k][i]); g.lineTo(...reproj[k][j]); } g.stroke(); }
+  g.font="bold 30px system-ui"; 
+  ORDER.forEach(p=>{ const [x,y]=ann[k][p]; g.fillStyle="#ffd400"; g.strokeStyle="#000"; g.lineWidth=3;
+    g.beginPath(); g.arc(x,y,13,0,7); g.fill(); g.stroke(); g.fillStyle="#fff"; g.strokeText(p,x+18,y-14); g.fillText(p,x+18,y-14); });
+}
+function pos(c,e){ const r=c.getBoundingClientRect(); return [(e.clientX-r.left)*1920/r.width,(e.clientY-r.top)*1080/r.height]; }
+function bind(k){ const c=$("c"+k);
+  c.addEventListener("pointerdown",e=>{ const [x,y]=pos(c,e); let best=null,bd=60*60;
+    ORDER.forEach(p=>{ const d=(ann[k][p][0]-x)**2+(ann[k][p][1]-y)**2; if(d<bd){bd=d;best=p;} });
+    if(best){ drag=[k,best]; c.setPointerCapture(e.pointerId); } });
+  c.addEventListener("pointermove",e=>{ if(drag&&drag[0]===k){ const [x,y]=pos(c,e); ann[k][drag[1]]=[Math.round(x),Math.round(y)]; reproj={}; draw(k);} });
+  c.addEventListener("pointerup",()=>{ drag=null; });
+}
+$("btnReset").onclick=()=>{ for(const k of FR){ ann[k]=JSON.parse(JSON.stringify(base[k])); } reproj={}; FR.forEach(draw); };
+
+$("btnDetect").onclick=async()=>{
+  $("btnDetect").disabled=true; $("stDetect").textContent="reading the feed…"; $("vid").play();
+  try{ const d=await (await fetch("/api/detect")).json();
+    $("detectOut").innerHTML=`<p><b>Pass detected</b> from ${d.pass_window_s[0]} s to ${d.pass_window_s[1]} s (${d.frames} frames at ${Math.round(d.fps)} fps).</p>
+      <p>Best frames picked automatically (largest, sharp, fully in view):</p><p>${d.auto_picked_frames.map(i=>`<span class="chip">frame ${i} · ${(i/d.fps).toFixed(2)} s</span>`).join("")}</p>
+      <p class="muted">The two frames measured below (240 and 256) lie inside this window.</p>`;
+    $("stDetect").textContent="done";
+  }catch(e){ $("stDetect").innerHTML='<span class="err">failed: '+e+'</span>'; }
+  $("btnDetect").disabled=false;
+};
+
+async function fit(mc){
+  const r=await fetch("/api/fit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({frames:ann,size:[1920,1080],mc})});
+  const j=await r.json(); if(j.error) throw new Error(j.error); return j;
+}
+function show(j){
+  const b=j.box_fit, c=j.counting_check, u=j.uncertainty;
+  $("vol").innerHTML=b.volume_m3.toFixed(1)+"<small> m³</small>";
+  let rows=`<tr><th></th><th>Width</th><th>Depth</th><th>Height</th><th>Volume</th></tr>
+    <tr><td>Box fit</td><td>${b.width_m.toFixed(2)} m</td><td>${b.depth_m.toFixed(2)} m</td><td>${b.height_m.toFixed(2)} m</td><td><b>${b.volume_m3.toFixed(1)} m³</b></td></tr>`;
+  if(u) rows+=`<tr><td>90% range</td><td>known</td><td>${u.depth_m_p05_p95.join(" – ")}</td><td>${u.height_m_p05_p95.join(" – ")}</td><td>${u.volume_m3_p05} – ${u.volume_m3_p95}</td></tr>`;
+  rows+=`<tr><td>Counting check<br><span class="muted">${c.pallets_across} × ${c.pallets_deep} pallets, ${c.layers} layers</span></td><td>2.40 m</td><td>${(c.pallets_deep*0.8).toFixed(2)} m</td><td>${b.height_m.toFixed(2)} m</td><td>${c.volume_m3.toFixed(1)} m³</td></tr>
+    <tr><td>Including pallets</td><td colspan="3"></td><td>${c.volume_incl_pallets_m3.toFixed(1)} m³</td></tr>`;
+  $("tbl").innerHTML=rows;
+  $("range").textContent=u?`90% range ${u.volume_m3_p05} to ${u.volume_m3_p95} m³ (${u.runs} refits with the corners shaken by click error). Corner fit error ${b.reproj_rms_px} px.`
+                          :`Corner fit error ${b.reproj_rms_px} px. Working out the range…`;
+}
+$("btnFit").onclick=async()=>{
+  $("btnFit").disabled=true; $("stFit").textContent="fitting…";
+  try{ const j=await fit(0); reproj=j.reproj; FR.forEach(draw); show(j);
+       $("stFit").textContent="estimating the range (about 20 s)…";
+       const k=await fit(80); show(k); $("stFit").textContent="done"; }
+  catch(e){ $("stFit").innerHTML='<span class="err">'+e.message+'</span>'; }
+  $("btnFit").disabled=false;
+};
+init();
+</script>
+</body>
+</html>

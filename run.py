@@ -1,0 +1,69 @@
+"""Command line version. For the UI run:  python app.py
+
+Usage:  python run.py [video_or_rtsp_url] [--realtime]
+Reads the feed frame by frame, detects the pass, picks the best frames,
+fits a 3D box to the load and writes out/result.json + out/overlay_*.jpg
+"""
+import json
+import sys
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+ROOT = Path(__file__).parent
+sys.path.insert(0, str(ROOT / "src"))
+from stream import FrameSource          # noqa: E402
+from detect import PassDetector         # noqa: E402
+from boxfit import ORDER                # noqa: E402
+from measure import measure             # noqa: E402
+
+
+def detect_pass(uri, realtime=False, keep=()):
+    src = FrameSource(uri, realtime=realtime)
+    det = PassDetector(src.size)
+    frames, t_first, t_last, n = {}, None, None, 0
+    for idx, t, frame in src:
+        ev = det.update(idx, t, frame)
+        if ev and idx > 5:
+            t_first = t if t_first is None else t_first
+            t_last = t
+        if idx in keep:
+            frames[idx] = frame.copy()
+        n = idx + 1
+    picks = det.best(k=3)
+    info = dict(source=Path(str(uri)).name if "://" not in str(uri) else str(uri), fps=src.fps, frames=n, size=list(src.size),
+                pass_window_s=[round(t_first, 2), round(t_last, 2)],
+                auto_picked_frames=[p["idx"] for p in picks])
+    return info, frames
+
+
+def main():
+    uri = next((a for a in sys.argv[1:] if not a.startswith("--")), str(ROOT / "data" / "pass_0216.mp4"))
+    ann = json.load(open(ROOT / "annotations" / "corners.json"))
+    keep = {int(k) for k in ann if k.isdigit()}
+    info, frames = detect_pass(uri, "--realtime" in sys.argv, keep)
+    res = {**info, **measure(ann, tuple(info["size"]))}
+    reproj = res.pop("reproj")
+    (ROOT / "out").mkdir(exist_ok=True)
+    json.dump(res, open(ROOT / "out" / "result.json", "w"), indent=2)
+    print(json.dumps(res, indent=2))
+
+    b, u = res["box_fit"], res.get("uncertainty", {})
+    edges = [(0, 1), (1, 2), (2, 3), (3, 0), (0, 4), (4, 5), (5, 3)]
+    for i in res["measured_frames"]:
+        img = frames[i]
+        rp = np.array(reproj[str(i)]).astype(int)
+        for a, c in edges:
+            cv2.line(img, tuple(rp[a]), tuple(rp[c]), (0, 255, 0), 3)
+        for k in ORDER:
+            cv2.circle(img, tuple(int(v) for v in ann[str(i)][k]), 7, (0, 255, 255), -1)
+        txt = (f"{b['width_m']:.1f} x {b['depth_m']:.2f} x {b['height_m']:.2f} m = {b['volume_m3']:.1f} m3"
+               f"  (90% range {u.get('volume_m3_p05', '?')}-{u.get('volume_m3_p95', '?')})")
+        cv2.rectangle(img, (20, 20), (1180, 80), (0, 0, 0), -1)
+        cv2.putText(img, txt, (30, 62), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        cv2.imwrite(str(ROOT / "out" / f"overlay_{i:04d}.jpg"), img)
+
+
+if __name__ == "__main__":
+    main()

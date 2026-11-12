@@ -1,0 +1,11 @@
+# personal notes and scratch work, not part of the submission
+_private/
+work/
+# full source video (92 MB, Linde's)
+vidssave.com*.mp4
+data/pass_0214.mp4
+data/*.png
+# local environment
+.venv/
+__pycache__/
+*.pyc
