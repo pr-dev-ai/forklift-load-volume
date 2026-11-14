@@ -19,6 +19,7 @@ from detect import PassDetector         # noqa: E402
 from boxfit import ORDER                # noqa: E402
 from measure import measure             # noqa: E402
 from autocorners import auto_corners    # noqa: E402
+from explain import step_images         # noqa: E402
 
 
 def detect_pass(uri, realtime=False, keep=()):
@@ -73,6 +74,8 @@ def main():
             tag = "" if name == "hand_marked" else "auto_"
             cv2.imwrite(str(ROOT / "out" / f"overlay_{tag}{i:04d}.jpg"),
                         draw(frames[i].copy(), corners[str(i)], reproj[str(i)], results[name], name.replace("_", " ")))
+    for n, img in enumerate(step_images(uri, idxs[-1], auto[str(idxs[-1])]), 1):   # what each step saw
+        cv2.imwrite(str(ROOT / "out" / f"step_{n}.jpg"), cv2.resize(img, (1280, 720)), [cv2.IMWRITE_JPEG_QUALITY, 88])
     res = {**info, **results, "automatic_corners": auto,
            "corner_distance_px": dict(mean=round(float(np.mean(dist)), 1), max=round(float(np.max(dist)), 1))}
     json.dump(res, open(ROOT / "out" / "result.json", "w"), indent=2)

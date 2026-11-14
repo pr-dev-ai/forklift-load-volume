@@ -32,6 +32,11 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--in
 .err{color:var(--warn)}
 ul{margin:0;padding-left:20px}li{margin-bottom:5px}
 .cap{font-size:.85rem;color:var(--ink2);margin-top:6px}
+.steps4{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+@media (max-width:700px){.steps4{grid-template-columns:1fr}}
+.steps4 figure{margin:0;min-width:0}.steps4 img{width:100%;height:auto;border-radius:6px;display:block}
+.steps4 figcaption{font-size:.85rem;color:var(--ink2);margin-top:6px}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -63,6 +68,15 @@ ul{margin:0;padding-left:20px}li{margin-bottom:5px}
   </div>
   <p class="cap" id="autoNote">How the automatic version works: the front face is the crate-blue region inside the moving silhouette, the side edge is the sunlit pallet wood under the crates, and the top edge follows the direction of the crate layers.</p>
   <p style="margin-top:12px"><button id="btnAuto">Detect corners automatically</button> <button id="btnFit">Fit the box</button> <button class="ghost" id="btnReset">Back to hand-marked</button><span class="status" id="stFit"></span></p>
+<div id="steps" hidden>
+    <h3 style="font-size:1rem;margin:18px 0 8px">How the corners were found</h3>
+    <div class="steps4">
+      <figure><img src="/out/step_1.jpg" alt="Step 1, silhouette" loading="lazy"><figcaption><b>1 Silhouette.</b> The camera is static, so the frame minus an empty background leaves everything that moved.</figcaption></figure>
+      <figure><img src="/out/step_2.jpg" alt="Step 2, front face" loading="lazy"><figcaption><b>2 Front face.</b> The crate-blue area inside the silhouette. One line per side, the crossings are corners A, B, C, D.</figcaption></figure>
+      <figure><img src="/out/step_3.jpg" alt="Step 3, pallet wood" loading="lazy"><figcaption><b>3 Side bottom edge.</b> The sunlit pallet wood under the crates. Its top is the edge, and where it stops is corner E.</figcaption></figure>
+      <figure><img src="/out/step_4.jpg" alt="Step 4, crate layers" loading="lazy"><figcaption><b>4 Side top edge.</b> Hidden behind the mast, so it follows the crate layer joints to one vanishing point. That gives corner F.</figcaption></figure>
+    </div>
+  </div>
 </section>
 
 <section>
@@ -121,12 +135,12 @@ function bind(k){ const c=$("c"+k);
   c.addEventListener("pointerup",()=>{ drag=null; });
 }
 let mode="Hand-marked corners";
-$("btnReset").onclick=()=>{ for(const k of FR){ ann[k]=JSON.parse(JSON.stringify(base[k])); } reproj={}; mode="Hand-marked corners"; $("stFit").textContent=""; FR.forEach(draw); };
+$("btnReset").onclick=()=>{ for(const k of FR){ ann[k]=JSON.parse(JSON.stringify(base[k])); } reproj={}; mode="Hand-marked corners"; $("stFit").textContent=""; $("steps").hidden=true; FR.forEach(draw); };
 $("btnAuto").onclick=async()=>{
   $("btnAuto").disabled=true; $("stFit").textContent="finding corners…";
   try{ const a=await (await fetch("/api/auto")).json(); if(a.error) throw new Error(a.error);
     let d=0,n=0; for(const k of FR){ for(const p of ORDER){ d+=Math.hypot(a[k][p][0]-base[k][p][0],a[k][p][1]-base[k][p][1]); n++; } ann[k]=a[k]; }
-    reproj={}; mode="Automatic corners"; FR.forEach(draw);
+    reproj={}; mode="Automatic corners"; FR.forEach(draw); $("steps").hidden=false;
     $("stFit").textContent="corners placed automatically, on average "+Math.round(d/n)+" px from the hand-marked ones. Now fit the box.";
   }catch(e){ $("stFit").innerHTML='<span class="err">'+e.message+'</span>'; }
   $("btnAuto").disabled=false;

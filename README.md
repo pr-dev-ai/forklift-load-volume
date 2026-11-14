@@ -38,6 +38,8 @@ the side of the load can be seen. It is treated as a camera feed and read frame 
    - Top edge of the side: hidden behind the mast, so its direction comes from the crate layer
      joints, which all aim at one vanishing point on the bottom edge line.
 
+   The UI shows a picture of each of these four steps (`out/step_1.jpg` to `step_4.jpg`).
+
    The hand-marked corners (`annotations/corners.json`) are kept as the reference. In the UI you
    can switch between both and drag any corner.
 4. `src/boxfit.py` fits one 3D box to both frames. The only real-world size given is the width:
