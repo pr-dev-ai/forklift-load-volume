@@ -16,6 +16,7 @@ ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT / "src"))
 from measure import measure            # noqa: E402
 from run import detect_pass            # noqa: E402
+from autocorners import auto_corners   # noqa: E402
 
 CLIP = ROOT / "data" / "pass_0216.mp4"
 PORT = int(os.environ.get("PORT", 8000))
@@ -79,6 +80,15 @@ class Handler(BaseHTTPRequestHandler):
                 if "detect" not in _cache:
                     _cache["detect"] = detect_pass(str(CLIP))[0]
             return self._json(_cache["detect"])
+        if p == "/api/auto":
+            try:
+                with _lock:
+                    if "auto" not in _cache:
+                        ann = json.load(open(ROOT / "annotations" / "corners.json"))
+                        _cache["auto"] = auto_corners(str(CLIP), sorted(int(k) for k in ann if k.isdigit()))
+                return self._json(_cache["auto"])
+            except Exception as e:
+                return self._json({"error": f"{type(e).__name__}: {e}"}, 400)
         if p.startswith("/data/") or p.startswith("/out/"):
             target = (ROOT / p.lstrip("/")).resolve()
             if ROOT.resolve() in target.parents:

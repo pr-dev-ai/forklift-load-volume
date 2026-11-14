@@ -148,6 +148,6 @@ def monte_carlo_joint(frames, sigmas, W, img_size, w_sigma=0.02, n=150, seed=1):
               for c, s in zip(frames, sigmas)]
         Wj = W * (1 + rng.normal(0, w_sigma))
         r = fit_joint(fr, Wj, img_size, n_starts=6, seed=i)
-        if r["rms_px"] < 8:
+        if r["rms_px"] < max(8, 2.5 * max(sigmas)):      # drop fits that did not converge
             out.append((Wj, r["H"], r["D"], Wj * r["H"] * r["D"]))
     return np.array(out)

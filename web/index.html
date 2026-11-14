@@ -55,19 +55,21 @@ ul{margin:0;padding-left:20px}li{margin-bottom:5px}
 </section>
 
 <section>
-  <h2><span>2</span>Mark the six corners</h2>
-  <p class="muted">The yellow dots are the corners of the crate stack (pallets excluded), marked by hand on two frames. Drag any dot to correct it. This is the one manual step.</p>
+  <h2><span>2</span>The six corners</h2>
+  <p class="muted">The yellow dots are the corners of the crate stack (pallets excluded). They start at the hand-marked positions. Press "Detect corners automatically" to let the program find them, then fit the box to compare. You can still drag any dot.</p>
   <div class="row">
     <div><canvas id="c240" width="1920" height="1080"></canvas><p class="cap">Frame 240</p></div>
     <div><canvas id="c256" width="1920" height="1080"></canvas><p class="cap">Frame 256</p></div>
   </div>
-  <p style="margin-top:12px"><button id="btnFit">Fit the box</button> <button class="ghost" id="btnReset">Reset corners</button><span class="status" id="stFit"></span></p>
+  <p class="cap" id="autoNote">How the automatic version works: the front face is the crate-blue region inside the moving silhouette, the side edge is the sunlit pallet wood under the crates, and the top edge follows the direction of the crate layers.</p>
+  <p style="margin-top:12px"><button id="btnAuto">Detect corners automatically</button> <button id="btnFit">Fit the box</button> <button class="ghost" id="btnReset">Back to hand-marked</button><span class="status" id="stFit"></span></p>
 </section>
 
 <section>
   <h2><span>3</span>Result</h2>
   <div class="row">
     <div>
+      <p class="cap" id="mode" style="margin:0 0 4px">&nbsp;</p>
       <div class="big" id="vol">–<small> m³</small></div>
       <p class="muted" id="range">Press "Fit the box".</p>
       <p class="cap">Volume of the crates only. The only real size given to the program is the width: two EUR pallets side by side = 2.4 m. It solves the camera, the depth and the height so that one 3D box matches the corners in both frames (green lines).</p>
@@ -85,7 +87,7 @@ ul{margin:0;padding-left:20px}li{margin-bottom:5px}
     <li><b>Depth is the weakest number.</b> The side of the load is seen at a steep angle, so a few pixels of error move depth by 10 cm or more. Drag a far corner and refit to see it.</li>
     <li><b>The top and back are never seen.</b> A full rectangular stack is assumed.</li>
     <li><b>It needs a known-size object.</b> No pallet in view means no scale.</li>
-    <li><b>Corners are marked by hand.</b> Automatic corner finding is the first thing to add; the backlight in this clip makes it hard.</li>
+    <li><b>Automatic corners are tuned to this scene.</b> They rely on blue crates, sunlit pallet wood and a load built from equal layers. Another load or lighting needs other cues, or a learned detector. The hand-marked corners stay as the reference.</li>
     <li><b>The pass detector assumes a static camera.</b></li>
     <li><b>On a fixed, calibrated camera</b> the focal length, floor and scale are known in advance, so one frame is enough and the depth range shrinks.</li>
   </ul>
@@ -115,10 +117,20 @@ function bind(k){ const c=$("c"+k);
   c.addEventListener("pointerdown",e=>{ const [x,y]=pos(c,e); let best=null,bd=60*60;
     ORDER.forEach(p=>{ const d=(ann[k][p][0]-x)**2+(ann[k][p][1]-y)**2; if(d<bd){bd=d;best=p;} });
     if(best){ drag=[k,best]; c.setPointerCapture(e.pointerId); } });
-  c.addEventListener("pointermove",e=>{ if(drag&&drag[0]===k){ const [x,y]=pos(c,e); ann[k][drag[1]]=[Math.round(x),Math.round(y)]; reproj={}; draw(k);} });
+  c.addEventListener("pointermove",e=>{ if(drag&&drag[0]===k){ mode="Corners adjusted by hand"; const [x,y]=pos(c,e); ann[k][drag[1]]=[Math.round(x),Math.round(y)]; reproj={}; draw(k);} });
   c.addEventListener("pointerup",()=>{ drag=null; });
 }
-$("btnReset").onclick=()=>{ for(const k of FR){ ann[k]=JSON.parse(JSON.stringify(base[k])); } reproj={}; FR.forEach(draw); };
+let mode="Hand-marked corners";
+$("btnReset").onclick=()=>{ for(const k of FR){ ann[k]=JSON.parse(JSON.stringify(base[k])); } reproj={}; mode="Hand-marked corners"; $("stFit").textContent=""; FR.forEach(draw); };
+$("btnAuto").onclick=async()=>{
+  $("btnAuto").disabled=true; $("stFit").textContent="finding corners…";
+  try{ const a=await (await fetch("/api/auto")).json(); if(a.error) throw new Error(a.error);
+    let d=0,n=0; for(const k of FR){ for(const p of ORDER){ d+=Math.hypot(a[k][p][0]-base[k][p][0],a[k][p][1]-base[k][p][1]); n++; } ann[k]=a[k]; }
+    reproj={}; mode="Automatic corners"; FR.forEach(draw);
+    $("stFit").textContent="corners placed automatically, on average "+Math.round(d/n)+" px from the hand-marked ones. Now fit the box.";
+  }catch(e){ $("stFit").innerHTML='<span class="err">'+e.message+'</span>'; }
+  $("btnAuto").disabled=false;
+};
 
 $("btnDetect").onclick=async()=>{
   $("btnDetect").disabled=true; $("stDetect").textContent="reading the feed…"; $("vid").play();
@@ -137,6 +149,7 @@ async function fit(mc){
 }
 function show(j){
   const b=j.box_fit, c=j.counting_check, u=j.uncertainty;
+  $("mode").textContent=mode;
   $("vol").innerHTML=b.volume_m3.toFixed(1)+"<small> m³</small>";
   let rows=`<tr><th></th><th>Width</th><th>Depth</th><th>Height</th><th>Volume</th></tr>
     <tr><td>Box fit</td><td>${b.width_m.toFixed(2)} m</td><td>${b.depth_m.toFixed(2)} m</td><td>${b.height_m.toFixed(2)} m</td><td><b>${b.volume_m3.toFixed(1)} m³</b></td></tr>`;
@@ -144,7 +157,7 @@ function show(j){
   rows+=`<tr><td>Counting check<br><span class="muted">${c.pallets_across} × ${c.pallets_deep} pallets, ${c.layers} layers</span></td><td>2.40 m</td><td>${(c.pallets_deep*0.8).toFixed(2)} m</td><td>${b.height_m.toFixed(2)} m</td><td>${c.volume_m3.toFixed(1)} m³</td></tr>
     <tr><td>Including pallets</td><td colspan="3"></td><td>${c.volume_incl_pallets_m3.toFixed(1)} m³</td></tr>`;
   $("tbl").innerHTML=rows;
-  $("range").textContent=u?`90% range ${u.volume_m3_p05} to ${u.volume_m3_p95} m³ (${u.runs} refits with the corners shaken by click error). Corner fit error ${b.reproj_rms_px} px.`
+  $("range").textContent=u?`90% range ${u.volume_m3_p05} to ${u.volume_m3_p95} m³ (${u.runs} refits with the corners shaken by their expected error). Corner fit error ${b.reproj_rms_px} px.`
                           :`Corner fit error ${b.reproj_rms_px} px. Working out the range…`;
 }
 $("btnFit").onclick=async()=>{
